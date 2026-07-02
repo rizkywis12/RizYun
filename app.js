@@ -2,12 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'frontend', 'public')));
@@ -24,24 +25,37 @@ const https = require('https');
 // Use a custom https agent to bypass SSL certificate verification when needed
 const httpsAgent = new https.Agent({ keepAlive: true, rejectUnauthorized: false });
 
+const S3_ACCESS_KEY = process.env.S3_ACCESS_KEY || '';
+const S3_SECRET_KEY = process.env.S3_SECRET_KEY || '';
+const S3_BUCKET = process.env.S3_BUCKET || 'rizyyn';
+const PRESIGN_EXPIRY = parseInt(process.env.PRESIGN_EXPIRY || '3600', 10);
+const AUTH_ENABLED = (process.env.AUTH_ENABLED || 'true').toLowerCase() !== 'false';
+const AUTH_USERNAME = process.env.AUTH_USERNAME || 'admin';
+const AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'admin123';
+const AUTH_SESSION_TTL = parseInt(process.env.AUTH_SESSION_TTL || '86400', 10);
+const missingS3Credentials = !S3_ACCESS_KEY || !S3_SECRET_KEY;
+const sessions = new Map();
+const gamsitRooms = new Map();
+const GAMSIT_CHOICES = ['rock', 'paper', 'scissors'];
+
 const s3Client = new S3Client({
   region: process.env.S3_REGION || 'us-east-1',
   endpoint: process.env.S3_ENDPOINT || 'https://s3.nevaobjects.id',
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY,
-    secretAccessKey: process.env.S3_SECRET_KEY,
-  },
+  credentials: missingS3Credentials
+    ? undefined
+    : {
+        accessKeyId: S3_ACCESS_KEY,
+        secretAccessKey: S3_SECRET_KEY,
+      },
   forcePathStyle: true,
   requestHandler: new NodeHttpHandler({ httpsAgent }),
 });
-
-const S3_BUCKET = process.env.S3_BUCKET || 'rizyyn';
-const PRESIGN_EXPIRY = parseInt(process.env.PRESIGN_EXPIRY || '3600', 10);
 
 console.log('S3 config:', {
   endpoint: process.env.S3_ENDPOINT,
   bucket: S3_BUCKET,
   region: process.env.S3_REGION,
+  missingCredentials: missingS3Credentials,
 });
 
 async function streamToString(stream) {
@@ -63,6 +77,52 @@ function encodeKeyForUrl(key) {
   return key.split('/').map(encodeURIComponent).join('/');
 }
 
+function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  return header.split(';').reduce((acc, part) => {
+    const [key, ...rest] = part.trim().split('=');
+    if (key) acc[key] = decodeURIComponent(rest.join('='));
+    return acc;
+  }, {});
+}
+
+function setSessionCookie(res, sessionId) {
+  res.setHeader('Set-Cookie', `sessionId=${sessionId}; HttpOnly; Path=/; Max-Age=${AUTH_SESSION_TTL}; SameSite=Lax`);
+}
+
+function clearSessionCookie(res) {
+  res.setHeader('Set-Cookie', 'sessionId=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax');
+}
+
+function createSession(username) {
+  const sessionId = crypto.randomBytes(24).toString('hex');
+  sessions.set(sessionId, { sessionId, username, role: 'editor', expiresAt: Date.now() + AUTH_SESSION_TTL * 1000 });
+  return sessionId;
+}
+
+function getSession(req) {
+  const cookies = parseCookies(req);
+  const sessionId = cookies.sessionId;
+  if (!sessionId) return null;
+  const session = sessions.get(sessionId);
+  if (!session) return null;
+  if (session.expiresAt <= Date.now()) {
+    sessions.delete(sessionId);
+    return null;
+  }
+  return session;
+}
+
+function requireEditor(req, res, next) {
+  if (!AUTH_ENABLED) return next();
+  const session = getSession(req);
+  if (!session || session.role !== 'editor') {
+    return res.status(401).json({ error: 'Authentication required.' });
+  }
+  req.authUser = session;
+  next();
+}
+
 async function getPresignedUrl(key) {
   if (!key) return null;
   try {
@@ -76,6 +136,32 @@ async function getPresignedUrl(key) {
 }
 
 // Routes
+app.get('/api/auth/me', (req, res) => {
+  const session = getSession(req);
+  if (!session) return res.json({ authenticated: false, role: 'viewer' });
+  return res.json({ authenticated: true, role: session.role, username: session.username });
+});
+
+app.post('/api/auth/login', express.json(), (req, res) => {
+  const { username, password } = req.body || {};
+  if (!AUTH_ENABLED) {
+    return res.json({ success: true, authenticated: true, role: 'editor' });
+  }
+  if (username === AUTH_USERNAME && password === AUTH_PASSWORD) {
+    const sessionId = createSession(username);
+    setSessionCookie(res, sessionId);
+    return res.json({ success: true, authenticated: true, role: 'editor' });
+  }
+  return res.status(401).json({ error: 'Invalid username or password.' });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  clearSessionCookie(res);
+  const session = getSession(req);
+  if (session) sessions.delete(session.sessionId);
+  return res.json({ success: true });
+});
+
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to RizYun API' });
 });
@@ -87,6 +173,12 @@ app.get('/api/health', (req, res) => {
 // List top-level folders (albums)
 app.get('/api/albums', async (req, res, next) => {
   try {
+    if (missingS3Credentials) {
+      return res.status(500).json({
+        error: 'S3 credentials are not configured. Set S3_ACCESS_KEY and S3_SECRET_KEY in .env.',
+      });
+    }
+
     const params = { Bucket: S3_BUCKET, Delimiter: '/' };
     const data = await s3Client.send(new ListObjectsV2Command(params));
 
@@ -118,7 +210,7 @@ app.get('/api/albums', async (req, res, next) => {
 });
 
 // Create a new album (create a placeholder object to create the prefix)
-app.post('/api/albums', express.json(), async (req, res, next) => {
+app.post('/api/albums', express.json(), requireEditor, async (req, res, next) => {
   try {
     const { name } = req.body;
     console.log('Create album request body:', req.body);
@@ -153,7 +245,7 @@ app.post('/api/albums', express.json(), async (req, res, next) => {
 });
 
 // Upload or update album thumbnail
-app.post('/api/albums/:name/thumbnail', upload.single('thumbnail'), async (req, res, next) => {
+app.post('/api/albums/:name/thumbnail', upload.single('thumbnail'), requireEditor, async (req, res, next) => {
   try {
     const name = req.params.name;
     if (!name) return res.status(400).json({ error: 'Missing album name' });
@@ -177,26 +269,31 @@ app.post('/api/albums/:name/thumbnail', upload.single('thumbnail'), async (req, 
   }
 });
 
-// Upload a photo inside an album
-app.post('/api/albums/:name/photos', upload.single('file'), async (req, res, next) => {
+// Upload one or more photos inside an album
+app.post('/api/albums/:name/photos', upload.array('file'), requireEditor, async (req, res, next) => {
   try {
     const name = req.params.name;
     if (!name) return res.status(400).json({ error: 'Missing album name' });
-    if (!req.file) return res.status(400).json({ error: 'No photo file uploaded' });
+    const files = req.files || [];
+    if (!files.length) return res.status(400).json({ error: 'No photo file uploaded' });
 
-    const clean = name.replace(/\/+$/, '');
-    const timestamp = Date.now();
-    const key = `${clean}/${timestamp}-${req.file.originalname}`;
-    const params = {
-      Bucket: S3_BUCKET,
-      Key: key,
-      Body: req.file.buffer,
-      ContentType: req.file.mimetype,
-    };
-    await s3Client.send(new PutObjectCommand(params));
-    const baseUrl = process.env.S3_BASE_URL || process.env.S3_ENDPOINT || 'https://s3.nevaobjects.id';
-    const url = `${baseUrl}/${S3_BUCKET}/${key}`;
-    res.status(201).json({ success: true, key, url });
+    const clean = name.replace(/\/+$|^\/+|\.\.+/g, '');
+    const results = await Promise.all(files.map(async (file) => {
+      const timestamp = Date.now();
+      const key = `${clean}/${timestamp}-${file.originalname}`;
+      const params = {
+        Bucket: S3_BUCKET,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      };
+      await s3Client.send(new PutObjectCommand(params));
+      const baseUrl = process.env.S3_BASE_URL || process.env.S3_ENDPOINT || 'https://s3.nevaobjects.id';
+      const url = `${baseUrl}/${S3_BUCKET}/${key}`;
+      return { success: true, key, url };
+    }));
+
+    res.status(201).json({ files: results });
   } catch (err) {
     console.error('Error uploading photo:', err);
     next(err);
@@ -204,7 +301,7 @@ app.post('/api/albums/:name/photos', upload.single('file'), async (req, res, nex
 });
 
 // Generic album upload endpoint (thumbnail or photo)
-app.post('/api/albums/:name/upload', upload.any(), async (req, res, next) => {
+app.post('/api/albums/:name/upload', upload.any(), requireEditor, async (req, res, next) => {
   try {
     const name = req.params.name;
     if (!name) return res.status(400).json({ error: 'Missing album name' });
@@ -233,14 +330,14 @@ app.post('/api/albums/:name/upload', upload.any(), async (req, res, next) => {
 });
 
 // Delete an object from an album
-app.delete('/api/albums/:name/files', express.json(), async (req, res, next) => {
+app.delete('/api/albums/:name/files', express.json(), requireEditor, async (req, res, next) => {
   try {
     const name = req.params.name;
     const { key } = req.body;
     if (!name) return res.status(400).json({ error: 'Missing album name' });
     if (!key || typeof key !== 'string') return res.status(400).json({ error: 'Missing key to delete' });
 
-    const cleanName = name.replace(/\/++$/g, '');
+    const cleanName = name.replace(/\/+$|^\/+/g, '');
     const cleanKey = key.replace(/^\/+/g, '').replace(/\/+$/g, '');
     if (!cleanKey.startsWith(`${cleanName}/`)) return res.status(400).json({ error: 'Invalid key for album' });
 
@@ -271,8 +368,173 @@ app.get('/api/albums/:name', async (req, res, next) => {
   }
 });
 
+app.get('/api/albums/:name/download', async (req, res, next) => {
+  try {
+    const name = req.params.name;
+    const key = req.query.key;
+    if (!name) return res.status(400).json({ error: 'Missing album name' });
+    if (!key) return res.status(400).json({ error: 'Missing object key' });
+    const cleanName = name.replace(/\/+$/g, '');
+    const cleanKey = key.replace(/^\/+|\/+$/g, '');
+    if (!cleanKey.startsWith(`${cleanName}/`)) return res.status(400).json({ error: 'Invalid object key for album' });
+    const url = await getPresignedUrl(cleanKey);
+    if (!url) return res.status(500).json({ error: 'Unable to generate download URL' });
+    res.redirect(url);
+  } catch (err) {
+    console.error('Error generating download URL:', err);
+    next(err);
+  }
+});
+
 // Upload file to S3
-app.post('/api/s3/upload', upload.single('file'), async (req, res, next) => {
+function generateRoomId() {
+  return crypto.randomBytes(3).toString('hex');
+}
+
+function generatePlayerId() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+function getPlayerKey(room, playerId) {
+  if (!room || !playerId) return null;
+  if (room.players.p1?.playerId === playerId) return 'p1';
+  if (room.players.p2?.playerId === playerId) return 'p2';
+  return null;
+}
+
+function getRoomState(room, playerId, baseUrl) {
+  const playerKey = getPlayerKey(room, playerId);
+  const opponentKey = playerKey === 'p1' ? 'p2' : 'p1';
+  const player = playerKey ? room.players[playerKey] : null;
+  const opponent = room.players[opponentKey] || null;
+  const result = room.result || null;
+  let displayResult = null;
+  if (result) {
+    if (result.winner === 'draw') displayResult = 'draw';
+    else if (result.winner === playerKey) displayResult = 'win';
+    else displayResult = 'lose';
+  }
+
+  return {
+    roomId: room.roomId,
+    status: room.status,
+    role: playerKey,
+    playerId: player?.playerId || null,
+    playerCount: [room.players.p1, room.players.p2].filter(Boolean).length,
+    yourChoice: player?.choice || null,
+    opponentConnected: !!opponent,
+    opponentChoice: room.status === 'finished' ? opponent?.choice || null : null,
+    result: displayResult,
+    winner: result?.winner || null,
+    choices: result?.choices || null,
+    roomUrl: `${baseUrl}/gamsit.html?room=${room.roomId}`,
+  };
+}
+
+function determineWinner(choice1, choice2) {
+  if (choice1 === choice2) return 'draw';
+  if (
+    (choice1 === 'rock' && choice2 === 'scissors') ||
+    (choice1 === 'paper' && choice2 === 'rock') ||
+    (choice1 === 'scissors' && choice2 === 'paper')
+  ) {
+    return 'p1';
+  }
+  return 'p2';
+}
+
+app.post('/api/gamsit/create-room', async (req, res) => {
+  const roomId = generateRoomId();
+  const playerId = generatePlayerId();
+  const room = {
+    roomId,
+    createdAt: Date.now(),
+    players: {
+      p1: { playerId, choice: null },
+      p2: null,
+    },
+    status: 'waiting',
+    result: null,
+  };
+  gamsitRooms.set(roomId, room);
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  res.json({
+    roomId,
+    roomUrl: `${baseUrl}/gamsit.html?room=${roomId}`,
+    playerId,
+    role: 'p1',
+    status: room.status,
+  });
+});
+
+app.post('/api/gamsit/room/:roomId/join', async (req, res) => {
+  const roomId = req.params.roomId;
+  const { playerId } = req.body || {};
+  const room = gamsitRooms.get(roomId);
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+
+  if (room.players.p1?.playerId === playerId) {
+    return res.json(getRoomState(room, playerId, `${req.protocol}://${req.get('host')}`));
+  }
+  if (room.players.p2?.playerId === playerId) {
+    return res.json(getRoomState(room, playerId, `${req.protocol}://${req.get('host')}`));
+  }
+
+  if (!room.players.p2) {
+    const newPlayerId = playerId || generatePlayerId();
+    room.players.p2 = { playerId: newPlayerId, choice: null };
+    room.status = 'ready';
+    return res.json(getRoomState(room, newPlayerId, `${req.protocol}://${req.get('host')}`));
+  }
+
+  return res.status(409).json({ error: 'Room is already full' });
+});
+
+app.get('/api/gamsit/room/:roomId', async (req, res) => {
+  const roomId = req.params.roomId;
+  const playerId = req.query.playerId;
+  const room = gamsitRooms.get(roomId);
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+  if (!playerId) return res.status(400).json({ error: 'Missing playerId' });
+  const roomState = getRoomState(room, playerId, `${req.protocol}://${req.get('host')}`);
+  if (!roomState.role) return res.status(403).json({ error: 'Player not found in room' });
+  res.json(roomState);
+});
+
+app.post('/api/gamsit/room/:roomId/choice', async (req, res) => {
+  const roomId = req.params.roomId;
+  const { playerId, choice } = req.body || {};
+  const room = gamsitRooms.get(roomId);
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+  if (!playerId) return res.status(400).json({ error: 'Missing playerId' });
+  if (!choice || !GAMSIT_CHOICES.includes(choice)) return res.status(400).json({ error: 'Invalid choice' });
+
+  const playerKey = getPlayerKey(room, playerId);
+  if (!playerKey) return res.status(403).json({ error: 'Player not found in room' });
+  if (!room.players.p2) return res.status(400).json({ error: 'Waiting for a second player to join' });
+  if (room.status === 'finished') return res.status(400).json({ error: 'Game already finished' });
+
+  room.players[playerKey].choice = choice;
+  const opponentKey = playerKey === 'p1' ? 'p2' : 'p1';
+  const opponent = room.players[opponentKey];
+
+  if (opponent?.choice) {
+    const winner = determineWinner(room.players.p1.choice, room.players.p2.choice);
+    room.status = 'finished';
+    room.result = {
+      winner,
+      choices: {
+        p1: room.players.p1.choice,
+        p2: room.players.p2.choice,
+      },
+    };
+  }
+
+  res.json(getRoomState(room, playerId, `${req.protocol}://${req.get('host')}`));
+});
+
+// Upload file to S3
+app.post('/api/s3/upload', upload.single('file'), requireEditor, async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
@@ -310,7 +572,7 @@ app.post('/api/s3/upload', upload.single('file'), async (req, res, next) => {
 });
 
 // Remove file from S3
-app.post('/api/s3/remove', express.json(), async (req, res, next) => {
+app.post('/api/s3/remove', express.json(), requireEditor, async (req, res, next) => {
   try {
     const { key } = req.body;
     if (!key) return res.status(400).json({ error: 'Missing key to delete' });

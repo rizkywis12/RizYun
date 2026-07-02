@@ -182,6 +182,7 @@ onMounted(() => {
   border-color: transparent;
 }
 
+
 .main-title {
   font-size: clamp(3rem, 8vw, 4.5rem);
   font-weight: 800;

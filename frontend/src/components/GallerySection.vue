@@ -7,11 +7,12 @@
             <p class="subtitle">Album terbaru</p>
           </div>
           <div>
-            <button class="add-album-btn" @click="showForm = true">+ Add Album</button>
+            <button v-if="canEdit" class="add-album-btn" @click="showForm = true">+ Add Album</button>
+            <p v-else class="viewer-note">Login sebagai editor untuk membuat album.</p>
           </div>
         </div>
 
-          <div class="carousel-wrap">
+      <div class="carousel-wrap">
         <button v-show="showNav" class="nav prev" @click="prev" aria-label="Previous">‹</button>
         <div ref="scroller" class="albums-scroller" @scroll="onScroll">
           <article class="album" v-for="album in albums" :key="album.id">
@@ -25,7 +26,7 @@
               </div>
               <a :href="`/gallery.html?album=${encodeURIComponent(album.name)}`" class="view-more">View gallery</a>
           </article>
-          <article v-if="albums.length === 0" class="album empty-card">
+          <article v-if="albums.length === 0 && !loadError" class="album empty-card">
             <div class="thumb thumb-fallback">📁</div>
             <div class="album-body">
               <h3>No albums yet</h3>
@@ -34,6 +35,9 @@
           </article>
         </div>
         <button v-show="showNav" class="nav next" @click="next" aria-label="Next">›</button>
+      </div>
+      <div v-if="loadError" class="load-error">
+        <p>{{ loadError }}</p>
       </div>
     
       <div v-if="showForm" class="modal-backdrop" @click.self="showForm = false">
@@ -61,20 +65,17 @@ console.log('API URL detected:', API_URL || 'relative /api path')
 const scroller = ref(null)
 const showNav = ref(false)
 const albums = ref([])
+const canEdit = ref(false)
 
-async function loadAlbums() {
+async function checkAuth() {
   try {
-    console.log('Loading albums from:', `${API_URL}/api/albums`)
-    const res = await fetch(`${API_URL}/api/albums`)
-    console.log('Load albums response status:', res.status, res.ok)
+    const res = await fetch(`${API_URL}/api/auth/me`, {
+      credentials: 'include'
+    })
     const data = await res.json()
-    console.log('Albums data:', data)
-    // map to local shape
-    albums.value = (data.albums || []).map((a, idx) => ({ id: idx + 1, name: a.name, title: a.name, sampleUrl: a.sampleUrl, count: a.count }))
-    console.log('Mapped albums:', albums.value)
-    updateNav()
+    canEdit.value = Boolean(data.authenticated && data.role === 'editor')
   } catch (e) {
-    console.error('Failed to load albums:', e)
+    canEdit.value = false
   }
 }
 
@@ -103,15 +104,47 @@ function onScroll() {
   updateNav()
 }
 
+async function loadAlbums() {
+  try {
+    loadError.value = ''
+    console.log('Loading albums from:', `${API_URL}/api/albums`)
+    const res = await fetch(`${API_URL}/api/albums`)
+    console.log('Load albums response status:', res.status, res.ok)
+    const data = await res.json()
+    if (!res.ok) {
+      loadError.value = data.error || `Unable to load albums: ${res.status}`
+      albums.value = []
+      return
+    }
+    console.log('Albums data:', data)
+    albums.value = (data.albums || []).map((a, idx) => ({ id: idx + 1, name: a.name, title: a.name, sampleUrl: a.sampleUrl, count: a.count }))
+    console.log('Mapped albums:', albums.value)
+    updateNav()
+  } catch (e) {
+    console.error('Failed to load albums:', e)
+    loadError.value = 'Network error: ' + e.message
+    albums.value = []
+  }
+}
+
 onMounted(() => {
   updateNav()
+  checkAuth()
   window.addEventListener('resize', updateNav)
+  window.addEventListener('rizyun-auth-changed', (event) => {
+    const data = event.detail || {}
+    canEdit.value = Boolean(data.authenticated && data.role === 'editor')
+    if (!canEdit.value) {
+      showForm.value = false
+    }
+  })
   loadAlbums()
 })
 
 const showForm = ref(false)
 const newAlbumName = ref('')
 const error = ref('')
+const loadError = ref('')
 
 async function createAlbum() {
   error.value = ''
@@ -122,13 +155,12 @@ async function createAlbum() {
     console.log('Creating album:', name)
     const res = await fetch(`${API_URL}/api/albums`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
     console.log('Response status:', res.status, res.ok)
+    const body = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const body = await res.json().catch(()=>({ error: 'Failed' }))
       console.log('Error response:', body)
       error.value = body.error || 'Failed to create album'
       return
     }
-    // success
     console.log('Album created successfully, loading albums...')
     showForm.value = false
     newAlbumName.value = ''
@@ -149,6 +181,7 @@ async function createAlbum() {
 .subtitle { color: var(--text-h); margin-bottom: 0.25rem; }
 .add-album-btn { border: none; background: var(--accent); color: #fff; padding: 0.95rem 1.4rem; border-radius: 999px; cursor: pointer; transition: transform .2s ease, background .2s ease; font-weight: 600; }
 .add-album-btn:hover { transform: translateY(-1px); background: #ff8b00; }
+.viewer-note { margin: 0.45rem 0 0; color: var(--text-h); font-size: 0.95rem; text-align: right; }
 
 .carousel-wrap { position: relative; display: flex; align-items: center; }
 .albums-scroller { display: flex; gap: 1rem; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding: 1rem 0.5rem; scroll-behavior: smooth; }
@@ -180,6 +213,15 @@ async function createAlbum() {
 .modal button[type="button"] { background: rgba(255,255,255,0.08); color: #fff; }
 .modal button[type="submit"] { background: var(--accent); color: #fff; }
 .modal .error { margin-top: 0.85rem; color: #ff7a7a; font-size: 0.95rem; }
+
+.load-error {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: 18px;
+  background: rgba(255, 64, 129, 0.08);
+  border: 1px solid rgba(255, 64, 129, 0.22);
+  color: #ffb3c9;
+}
 
 @media (max-width: 900px) {
   .album { flex: 0 0 72%; min-width: 72%; }

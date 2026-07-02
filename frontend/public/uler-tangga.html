@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waktu Bersama — Ular Tangga Pasangan</title>
+<style>
+  :root{
+    --night:#1B1A35;
+    --night2:#252348;
+    --cream:#F6EFE3;
+    --rose:#D98B95;
+    --gold:#E8B85C;
+    --teal:#5C8A89;
+    --ink:#2A2740;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(232,184,92,0.12), transparent 40%),
+      radial-gradient(circle at 85% 75%, rgba(92,138,137,0.15), transparent 45%),
+      var(--night);
+    color:var(--cream);
+    font-family: Georgia, 'Times New Roman', serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:24px 12px 60px;
+  }
+  .stars{
+    position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      radial-gradient(1px 1px at 10% 15%, #fff, transparent),
+      radial-gradient(1px 1px at 30% 70%, #fff, transparent),
+      radial-gradient(1px 1px at 60% 25%, #fff, transparent),
+      radial-gradient(1px 1px at 80% 60%, #fff, transparent),
+      radial-gradient(1px 1px at 45% 85%, #fff, transparent),
+      radial-gradient(1px 1px at 90% 20%, #fff, transparent),
+      radial-gradient(1px 1px at 20% 45%, #fff, transparent);
+    opacity:.5;
+  }
+  header{
+    text-align:center;
+    margin-bottom:14px;
+    position:relative;
+    z-index:1;
+    width:100%;
+    max-width:1100px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .title-block{ flex:1; }
+  h1{
+    font-size:clamp(26px,5vw,40px);
+    margin:0;
+    letter-spacing:.5px;
+    color:var(--gold);
+    text-shadow:0 2px 14px rgba(232,184,92,.25);
+  }
+  .subtitle{
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:12px;
+    letter-spacing:3px;
+    text-transform:uppercase;
+    color:var(--teal);
+    margin-top:6px;
+  }
+  #soundToggle{
+    position:absolute;
+    right:12px; top:12px;
+    background:rgba(246,239,227,.08);
+    border:1px solid rgba(232,184,92,.4);
+    color:var(--cream);
+    width:42px;height:42px;
+    border-radius:50%;
+    font-size:18px;
+    cursor:pointer;
+    z-index:2;
+  }
+  #backBtn{
+    position:absolute;
+    left:12px; top:12px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:42px; height:42px;
+    border-radius:50%;
+    border:1px solid rgba(232,184,92,.4);
+    background:rgba(246,239,227,.08);
+    color:var(--cream);
+    text-decoration:none;
+    font-size:18px;
+    z-index:2;
+  }
+  .layout{
+    display:flex;
+    gap:28px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+    justify-content:center;
+    max-width:1100px;
+    width:100%;
+    position:relative;
+    z-index:1;
+  }
+  #board{
+    display:grid;
+    grid-template-columns:repeat(10, 1fr);
+    grid-template-rows:repeat(10, 1fr);
+    width:min(560px,92vw);
+    height:min(560px,92vw);
+    border:3px solid var(--gold);
+    border-radius:10px;
+    background:var(--night2);
+    box-shadow:0 20px 50px rgba(0,0,0,.5), inset 0 0 40px rgba(232,184,92,.05);
+    position:relative;
+    overflow:hidden;
+  }
+  .cell{
+    position:relative;
+    border:1px solid rgba(246,239,227,.08);
+    display:flex;
+    align-items:flex-start;
+    justify-content:flex-end;
+    padding:2px 4px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:9px;
+    color:rgba(246,239,227,.35);
+  }
+  .cell.start{ background:rgba(92,138,137,.18); }
+  .cell.finish{ background:rgba(232,184,92,.22); }
+  .cell.ladder{ background:rgba(92,138,137,.28); }
+  .cell.snake{ background:rgba(217,139,149,.22); }
+  .cell.card{ background:rgba(232,184,92,.12); }
+  .cell-icon{
+    position:absolute;
+    bottom:2px; left:3px;
+    font-size:12px;
+  }
+  .token{
+    width:14px;height:14px;border-radius:50%;
+    position:absolute;
+    border:2px solid var(--night);
+    box-shadow:0 2px 4px rgba(0,0,0,.4);
+    transition: transform .3s ease;
+    z-index:5;
+    animation: hop .38s ease;
+  }
+  @keyframes hop{
+    0%{ transform: translateY(0) scale(1); }
+    40%{ transform: translateY(-6px) scale(1.15); }
+    100%{ transform: translateY(0) scale(1); }
+  }
+  .token.p1{ background:var(--rose); bottom:3px; left:3px; }
+  .token.p2{ background:var(--teal); bottom:3px; right:3px; }
+
+  .panel{
+    width:min(360px,92vw);
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .card-box{
+    background:var(--night2);
+    border:1px solid rgba(232,184,92,.3);
+    border-radius:14px;
+    padding:18px 20px;
+  }
+  .players{ display:flex; gap:10px; }
+  .player-pill{
+    flex:1;
+    border-radius:10px;
+    padding:10px 12px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:13px;
+    border:2px solid transparent;
+    background:rgba(246,239,227,.05);
+    transition:.2s;
+  }
+  .player-pill.active{ border-color:var(--gold); background:rgba(232,184,92,.1); }
+  .player-pill .dot{ display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px; }
+  .p1dot{background:var(--rose);} .p2dot{background:var(--teal);} 
+  .player-pill .pos{ opacity:.6; font-size:11px; display:block; margin-top:3px; }
+
+  #dice{
+    width:70px;height:70px;
+    margin:10px auto;
+    background:var(--cream);
+    color:var(--ink);
+    border-radius:14px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:30px;font-weight:bold;
+    box-shadow:0 6px 18px rgba(0,0,0,.35);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  #rollBtn{
+    display:block;
+    margin:0 auto;
+    background:var(--gold);
+    color:var(--ink);
+    border:none;
+    padding:12px 26px;
+    border-radius:30px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight:600;
+    font-size:15px;
+    cursor:pointer;
+    transition:.15s;
+  }
+  #rollBtn:hover:not(:disabled){ transform:translateY(-2px); box-shadow:0 8px 16px rgba(232,184,92,.3); }
+  #rollBtn:disabled{ opacity:.4; cursor:not-allowed; }
+
+  #status{
+    text-align:center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:13px;
+    color:rgba(246,239,227,.7);
+    min-height:36px;
+    margin-top:6px;
+  }
+  .legend{
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:11.5px;
+    color:rgba(246,239,227,.6);
+    line-height:1.7;
+  }
+  .legend b{color:var(--gold);}
+  .mode-tag{
+    text-align:center;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:11px;
+    letter-spacing:1.5px;
+    text-transform:uppercase;
+    color:var(--gold);
+    margin-bottom:4px;
+  }
+
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(10,10,20,.78);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+  .overlay.show{ display:flex; }
+  .postcard{
+    background:var(--cream);
+    color:var(--ink);
+    width:min(420px,100%);
+    border-radius:6px;
+    padding:0;
+    box-shadow:0 30px 60px rgba(0,0,0,.5);
+    position:relative;
+    transform:rotate(-1deg);
+    border:1px solid rgba(0,0,0,.08);
+  }
+  .postcard::before{
+    content:"";
+    position:absolute; inset:8px;
+    border:1px dashed rgba(42,39,64,.25);
+    border-radius:4px;
+    pointer-events:none;
+  }
+  .pc-head{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 22px 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--teal);
+  }
+  .pc-stamp{
+    width:34px;height:40px;
+    border:2px dotted var(--rose);
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;
+    transform:rotate(4deg);
+  }
+  .pc-body{ padding:18px 26px 8px; }
+  .pc-type{
+    display:inline-block;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:11px; font-weight:700; letter-spacing:1px;
+    padding:4px 10px; border-radius:20px; margin-bottom:10px;
+  }
+  .pc-type.q{ background:rgba(92,138,137,.18); color:var(--teal); }
+  .pc-type.d{ background:rgba(217,139,149,.25); color:#a8505e; }
+  .pc-text{ font-size:18px; line-height:1.5; }
+  .pc-foot{ padding:14px 22px 20px; text-align:right; }
+  .pc-foot button{
+    background:var(--ink); color:var(--cream); border:none;
+    padding:10px 20px; border-radius:24px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:13px; cursor:pointer;
+  }
+  .win-overlay .postcard{ text-align:center; }
+  .win-overlay .pc-text{ font-size:20px; }
+
+  .mode-options{
+    display:flex; gap:12px; margin-top:14px; flex-wrap:wrap;
+  }
+  .mode-card{
+    flex:1; min-width:160px;
+    border:2px solid rgba(42,39,64,.15);
+    border-radius:10px;
+    padding:14px;
+    cursor:pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    transition:.15s;
+    background:rgba(255,255,255,.4);
+  }
+  .mode-card:hover{ border-color:var(--rose); }
+  .mode-card.selected{ border-color:var(--ink); background:rgba(232,184,92,.18); }
+  .mode-card .em{ font-size:26px; display:block; margin-bottom:6px; }
+  .mode-card .nm{ font-weight:700; font-size:14px; }
+  .mode-card .ds{ font-size:11.5px; opacity:.7; margin-top:4px; line-height:1.4; }
+  #startGameBtn{
+    margin-top:16px;
+    width:100%;
+    background:var(--ink); color:var(--cream); border:none;
+    padding:12px; border-radius:24px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:14px; font-weight:600; cursor:pointer;
+  }
+  #startGameBtn:disabled{ opacity:.4; cursor:not-allowed; }
+  @media (max-width:560px){ .layout{ flex-direction:column; align-items:center; } }
+</style>
+</head>
+<body>
+<div class="stars"></div>
+<header>
+  <a id="backBtn" href="/games.html" title="Kembali ke daftar game">←</a>
+  <div class="title-block">
+    <h1>Waktu Bersama</h1>
+    <div class="subtitle">Ular Tangga edisi kencan</div>
+  </div>
+  <button id="soundToggle" title="Suara on/off">🔊</button>
+</header>
+
+<div class="layout">
+  <div id="board"></div>
+  <div class="panel">
+    <div class="card-box">
+      <div class="mode-tag" id="modeTag">Mode: —</div>
+      <div class="players">
+        <div class="player-pill active" id="pill1"><span class="dot p1dot"></span>Aku<span class="pos" id="pos1">Kotak 1</span></div>
+        <div class="player-pill" id="pill2"><span class="dot p2dot"></span>Kamu<span class="pos" id="pos2">Kotak 1</span></div>
+      </div>
+      <div id="dice">?</div>
+      <button id="rollBtn">🎲 Lempar Dadu</button>
+      <div id="status">Pilih mode dulu, yuk!</div>
+    </div>
+    <div class="card-box legend">
+      <div><span class="cell-icon">🪜</span> <b>Tangga</b> — naik lebih cepat</div>
+      <div><span class="cell-icon">🐍</span> <b>Ular</b> — mundur, sabar ya</div>
+      <div><span class="cell-icon">✉️</span> <b>Kartu Pos</b> — jawab sesuai mode yang dipilih</div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay show" id="modeOverlay">
+  <div class="postcard">
+    <div class="pc-head"><span>Pilih Mode Main</span><div class="pc-stamp">🎲</div></div>
+    <div class="pc-body">
+      <div class="pc-text" style="font-size:14px;">Mau main yang gimana hari ini?</div>
+      <div class="mode-options">
+        <div class="mode-card" data-mode="deep">
+          <span class="em">💬</span>
+          <div class="nm">Deep Talk</div>
+          <div class="ds">Obrolan dalam &amp; jujur soal perasaan, hubungan, dan masa depan.</div>
+        </div>
+        <div class="mode-card" data-mode="tod">
+          <span class="em">🔥</span>
+          <div class="nm">Truth or Dare</div>
+          <div class="ds">Campur pertanyaan jujur dan tantangan seru buat berdua.</div>
+        </div>
+      </div>
+      <button id="startGameBtn" disabled>Mulai Main</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="cardOverlay">
+  <div class="postcard">
+    <div class="pc-head"><span>Kartu Pos · Waktu Bersama</span><div class="pc-stamp">💌</div></div>
+    <div class="pc-body">
+      <span class="pc-type" id="cardType">PERTANYAAN</span>
+      <div class="pc-text" id="cardText">...</div>
+    </div>
+    <div class="pc-foot"><button id="cardCloseBtn">Sudah dijawab ✓</button></div>
+  </div>
+</div>
+
+<div class="overlay win-overlay" id="winOverlay">
+  <div class="postcard">
+    <div class="pc-head"><span>Tiba di Tujuan</span><div class="pc-stamp">🏁</div></div>
+    <div class="pc-body">
+      <div class="pc-text" id="winText">...</div>
+    </div>
+    <div class="pc-foot"><button id="winCloseBtn">Main lagi</button></div>
+  </div>
+</div>
+
+<script>
+let actx = null;
+let soundOn = true;
+let musicTimer = null;
+let musicStep = 0;
+function ensureCtx(){ if(!actx){ actx = new (window.AudioContext || window.webkitAudioContext)(); } if(actx.state === 'suspended') actx.resume(); return actx; }
+function tone(freq, dur, opts={}){ if(!soundOn) return; const ctx = ensureCtx(); const t0 = ctx.currentTime; const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.type = opts.type || 'sine'; osc.frequency.setValueAtTime(freq, t0); if(opts.sweepTo){ osc.frequency.exponentialRampToValueAtTime(opts.sweepTo, t0+dur); } gain.gain.setValueAtTime(0, t0); gain.gain.linearRampToValueAtTime(opts.vol || 0.18, t0+0.02); gain.gain.exponentialRampToValueAtTime(0.001, t0+dur); osc.connect(gain).connect(ctx.destination); osc.start(t0); osc.stop(t0+dur+0.02); }
+function noiseBurst(dur, vol){ if(!soundOn) return; const ctx = ensureCtx(); const bufferSize = ctx.sampleRate * dur; const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate); const data = buffer.getChannelData(0); for(let i=0;i<bufferSize;i++){ data[i] = (Math.random()*2-1) * (1 - i/bufferSize); } const noise = ctx.createBufferSource(); noise.buffer = buffer; const gain = ctx.createGain(); gain.gain.setValueAtTime(vol||0.12, ctx.currentTime); noise.connect(gain).connect(ctx.destination); noise.start(); }
+function sfxDiceTick(){ tone(520+Math.random()*120, 0.06, {type:'square', vol:0.1}); }
+function sfxStep(){ tone(300, 0.08, {type:'triangle', vol:0.12}); }
+function sfxLadder(){ tone(440, 0.5, {type:'sine', sweepTo:880, vol:0.16}); }
+function sfxSnake(){ tone(700, 0.55, {type:'sawtooth', sweepTo:180, vol:0.14}); }
+function sfxCard(){ noiseBurst(0.18, 0.10); tone(660,0.12,{type:'triangle',vol:0.12}); }
+function sfxWin(){ [523,659,784,1046].forEach((f,i)=> setTimeout(()=>tone(f,0.3,{type:'sine',vol:0.18}), i*140) ); }
+function sfxClick(){ tone(380,0.05,{type:'sine',vol:0.08}); }
+const musicNotes = [392, 440, 494, 392, 523, 494, 440, 392];
+function startMusic(){ if(musicTimer) return; musicStep = 0; musicTimer = setInterval(()=>{ if(!soundOn) return; const f = musicNotes[musicStep % musicNotes.length]; tone(f, 0.9, {type:'sine', vol:0.045}); tone(f/2, 1.4, {type:'sine', vol:0.03}); musicStep++; }, 950); }
+function stopMusic(){ if(musicTimer){ clearInterval(musicTimer); musicTimer=null; } }
+document.getElementById('soundToggle').addEventListener('click', ()=>{ ensureCtx(); soundOn = !soundOn; document.getElementById('soundToggle').textContent = soundOn ? '🔊' : '🔇'; if(soundOn){ startMusic(); } else { stopMusic(); } });
+const SIZE = 10; const TOTAL = SIZE*SIZE;
+function cellIndexToRC(idx){ const n = idx-1; const rowFromBottom = Math.floor(n/SIZE); const row = SIZE-1-rowFromBottom; let col = n % SIZE; if(rowFromBottom % 2 === 1) col = SIZE-1-col; return {row,col}; }
+const ladders = { 2:38, 7:14, 8:31, 15:26, 21:42, 28:84, 36:44, 51:67, 71:91, 78:98 }; const snakes  = { 16:6, 46:25, 49:11, 62:19, 64:60, 74:53, 89:68, 92:88, 95:75, 99:80 };
+const cardCells = [4,10,13,19,24,30,34,40,45,53,58,63,69,73,79,83,87,93,97];
+const decks = { deep: [
+    {type:'q', text:"Apa satu hal yang bikin kamu merasa paling dicintai olehku?"},
+    {type:'q', text:"Kalau boleh ubah satu kebiasaanku, apa itu dan kenapa?"},
+    {type:'q', text:"Apa ketakutan terbesarmu soal hubungan ini, dan apa yang bisa bikin kamu lebih tenang?"},
+    {type:'q', text:"Momen apa yang bikin kamu yakin aku orang yang tepat?"},
+    {type:'q', text:"Apa yang pengen kamu perbaiki dari cara kita berkomunikasi?"},
+    {type:'q', text:"Kalau lima tahun lagi kita masih bareng, kamu bayangin hidup kita kayak gimana?"},
+    {type:'q', text:"Apa hal dari keluarga atau masa lalu yang masih kamu bawa ke hubungan kita?"},
+    {type:'q', text:"Kapan terakhir kali kamu merasa benar-benar didengar olehku?"},
+    {type:'q', text:"Apa satu hal yang belum pernah kamu bilang tapi pengen aku tahu?"},
+    {type:'q', text:"Bagaimana cara terbaik buat aku mendukungmu saat kamu lagi capek atau down?"},
+    {type:'q', text:"Apa arti 'rumah' buat kamu, dan apakah aku bagian dari itu?"},
+    {type:'q', text:"Apa nilai hidup yang paling penting buat kamu dalam sebuah hubungan?"},
+    {type:'q', text:"Pernah nggak kamu merasa jauh secara emosional walau kita sedang bersama? Cerita dong."},
+    {type:'q', text:"Apa yang kamu butuhkan dariku saat kamu sedang marah atau kecewa?"},
+    {type:'q', text:"Bagaimana kamu ingin kita menghadapi konflik di masa depan?"},
+    {type:'q', text:"Apa satu mimpi besar yang belum pernah kamu ceritakan ke siapa pun?"},
+    {type:'q', text:"Apa yang membuatmu merasa aman dalam hubungan ini?"},
+    {type:'q', text:"Jika kita bertengkar besok, apa yang paling kamu harapkan dariku?"},
+    {type:'q', text:"Apa satu hal kecil yang aku lakukan yang ternyata sangat berarti buatmu?"},
+    {type:'q', text:"Apa yang kamu pelajari tentang cinta dari hubungan kita selama ini?"},
+    {type:'q', text:"Kamu lebih suka makan bareng di warung pinggir jalan atau restoran? Kenapa?"},
+    {type:'q', text:"Kalau keluargamu nggak setuju sama aku, kamu bakal gimana?"},
+    {type:'q', text:"Seberapa penting restu orang tua buat kamu sebelum melanjutkan hubungan ini?"},
+    {type:'q', text:"Apa hal pertama yang kamu ceritain ke ibu/bapakmu soal aku?"},
+    {type:'q', text:"Kamu lebih nyaman tinggal di kota besar atau kota kecil setelah menikah nanti?"},
+    {type:'q', text:"Lebaran atau Natalan, gimana kamu bayangin kita rayain bareng keluarga masing-masing?"},
+    {type:'q', text:"Kalau kita beda agama, kamu pikir itu bisa jadi masalah serius di masa depan?"},
+    {type:'q', text:"Pernah nggak kamu takut dihakimi orang sekitar soal hubungan kita?"},
+    {type:'q', text:"Apakah pendapat teman-temanmu soal aku penting buatmu?"},
+    {type:'q', text:"Kalau kita jalan bareng dan ketemu orang yang kamu kenal, kamu langsung kenalin aku nggak?"},
+    {type:'q', text:"Apa hal paling memalukan yang pernah terjadi pas kita lagi kencan bareng?"},
+    {type:'q', text:"Kamu tipe yang suka kasih kejutan atau lebih suka dikasih tahu jauh-jauh hari?"},
+    {type:'q', text:"Seberapa sering kamu pengen quality time berdua tanpa gangguan HP?"},
+    {type:'q', text:"Kalau kita liburan bareng, kamu lebih suka ke pantai, gunung, atau kota?"},
+    {type:'q', text:"Apa makanan yang selalu bikin kamu inget aku?"},
+    {type:'q', text:"Pernah nggak kamu cemburu tanpa alasan yang jelas, dan itu soal apa?"},
+    {type:'q', text:"Apa ekspektasi kamu soal keuangan dalam hubungan ini — siapa yang bayar apa?"},
+    {type:'q', text:"Kamu lebih suka dibeliin hadiah mahal tapi jarang, atau hadiah kecil tapi sering?"},
+    {type:'q', text:"Kalau kamu lagi PMS atau bad mood, kamu mau aku ngapain?"},
+    {type:'q', text:"Seberapa penting media sosial buat kamu — kamu mau posting soal kita atau lebih private?"},
+    {type:'q', text:"Apa yang bikin kamu malas duluan kalau lagi debat sama aku?"},
+    {type:'q', text:"Kalau aku pindah kerja ke luar kota, kamu siap nggak?"},
+    {type:'q', text:"Seberapa sering kamu butuh waktu sendiri, dan itu normal buat kamu?"},
+    {type:'q', text:"Apa hal yang nggak pernah boleh aku sebarkan ke orang lain soal kamu?"},
+    {type:'q', text:"Kalau ada masalah keluargamu yang berat, kamu bakal cerita ke aku atau handle sendiri?"},
+    {type:'q', text:"Apa yang bikin kamu ngerasa direspek dalam hubungan ini?"},
+    {type:'q', text:"Kamu tipe yang suka ngobrol panjang malam-malam atau lebih suka diam berdua?"},
+    {type:'q', text:"Apa kebiasaan keluargaku yang bikin kamu kagum atau justru bikin kamu bingung?"},
+    {type:'q', text:"Kalau kita bisa umroh atau haji bareng, itu ada di bayangan kamu nggak?"},
+    {type:'q', text:"Apa yang bikin kamu ngerasa aku beda dari orang lain yang pernah kamu suka?"},
+    {type:'q', text:"Kalau besok kita bisa liburan gratis ke mana aja di Indonesia, kamu pilih mana?"},
+    {type:'q', text:"Apakah kamu tipe yang butuh validasi dari pasangan, atau cukup dari diri sendiri?"},
+    {type:'q', text:"Hal apa yang masih pengen kamu capai sendiri sebelum kita memutuskan sesuatu yang lebih serius?"},
+    {type:'q', text:"Apa yang paling bikin kamu bersyukur dari karakter keluargaku?"},
+    {type:'q', text:"Kalau aku salah, kamu lebih suka langsung bilang atau diam dulu sampai siap?"},
+    {type:'q', text:"Apa yang kamu pikirin pertama kali saat aku marah sama kamu?"},
+    {type:'q', text:"Seberapa jauh kamu bisa kompromi soal nilai-nilai yang kamu pegang?"},
+    {type:'q', text:"Apa satu momen di hubungan kita yang bikin kamu nangis diam-diam?"},
+    {type:'q', text:"Kamu lebih pilih punya banyak teman yang aku kenal juga, atau lingkaran teman kita tetap terpisah?"},
+    {type:'q', text:"Apa satu hal yang masih kamu rahasiakan dari aku karena takut aku salah paham?"},
+    {type:'q', text:"Kalau aku ketemu mantan kamu di jalan, kamu bakal gimana?"},
+    {type:'q', text:"Apakah kamu tipe yang gampang memaafkan, atau perlu waktu lama?"},
+    {type:'q', text:"Apa yang bikin kamu ngerasa dikagumi oleh aku?"},
+    {type:'q', text:"Kalau kamu bisa pilih satu sifatku yang mau kamu wariskan ke anak kita nanti, apa itu?"},
+    {type:'q', text:"Apa hal yang masih pengen kamu pelajari dari aku?"},
+    {type:'q', text:"Pernah nggak kamu ngerasa minder soal sesuatu di depan aku?"},
+    {type:'q', text:"Apa arti kesetiaan buatmu dalam hubungan ini?"},
+    {type:'q', text:"Kalau kita punya masalah, kamu lebih suka selesaikan hari itu juga atau kasih jeda dulu?"},
+    {type:'q', text:"Apa hal paling random yang sering kamu pikirin soal masa depan kita?"},
+    {type:'q', text:"Kalau kamu bisa tukar satu pengalaman hidup sama aku, kamu mau aku rasain yang mana?"},
+    {type:'q', text:"Apa yang bikin kamu ngeresa hubungan ini worth it, bahkan di hari-hari yang susah?"},
+    {type:'q', text:"Seberapa penting kata 'maaf' buatmu, dan apa yang bikin maaf itu terasa tulus?"},
+    {type:'q', text:"Apa yang kamu harapin dari hubungan kita yang belum kamu dapatkan?"},
+    {type:'q', text:"Kalau aku lagi capek dan nggak bisa nemenin, kamu ngapain biasanya?"},
+    {type:'q', text:"Apa satu tradisi keluargamu yang pengen kamu bawa ke keluarga kita nanti?"},
+    {type:'q', text:"Gimana cara kamu tau kamu udah benar-benar cinta, bukan sekadar suka?"},
+    {type:'q', text:"Apa yang kamu pikirin soal pernikahan — sesuatu yang kamu impikan atau justru bikin deg-degan?"},
+    {type:'q', text:"Kalau ada satu hal yang bisa aku lakukan lebih baik sebagai pasangan, itu apa?"},
+    {type:'q', text:"Apa lagu Indonesia yang menurutmu paling cocok jadi 'lagu kita'?"},
+    {type:'q', text:"Kalau hidup kita bisa jadi sinetron, episode paling dramatis kita yang mana?"},
+    {type:'q', text:"Apa nilai dari orang tuamu yang paling berpengaruh ke cara kamu mencintai seseorang?"},
+    {type:'q', text:"Seberapa sering kamu ngeresa kita udah 'nyambung' tanpa perlu ngomong banyak?"},
+    {type:'q', text:"Apakah kamu pernah ngerasa terlalu bergantung sama aku? Itu nyaman atau justru khawatir?"},
+    {type:'q', text:"Kalau kita berdua sama-sama susah secara finansial, apa yang bakal kamu lakukan?"},
+    {type:'q', text:"Apa satu momen ketemu yang bikin kamu langsung mau ketemu lagi?"},
+    {type:'q', text:"Gimana kamu bayangin kita ngurus orang tua masing-masing kalau mereka udah tua nanti?"},
+    {type:'q', text:"Apa hal yang paling kamu kagumi dari cara aku menghadapi masalah?"},
+    {type:'q', text:"Kalau ada teman kita yang nggak suka sama hubungan ini, kamu gimana?"},
+    {type:'q', text:"Apa yang menurutmu masih kurang dari cara aku menunjukkan kasih sayang?"},
+    {type:'q', text:"Pernah nggak kamu ngeresa takut kehilangan aku, tapi nggak tau cara ngomongnya?"},
+    {type:'q', text:"Apa satu kata yang paling cocok buat menggambarkan perasaanmu hari ini tentang aku?"},
+    {type:'q', text:"Kalau kamu bisa kirim satu pesan ke aku 5 tahun lalu, apa yang kamu tulis?"},
+    {type:'q', text:"Hal apa yang bikin kamu ngeresa kita tumbuh bareng, bukan cuma jalan bareng?"},
+    {type:'q', text:"Apakah ada hal yang aku anggap biasa tapi sebenernya sangat berarti buat kamu?"},
+    {type:'q', text:"Kalau kita bisa punya satu ritual rutin berdua, kamu mau ritualnya apa?"},
+    {type:'q', text:"Apa yang bikin kamu berani untuk terus memilih aku, bahkan di momen yang berat?"},
+  ],
+  tod: [
+    {type:'q', text:"Apa kebiasaan kecilku yang bikin kamu gemas tiap kali ketemu?"},
+    {type:'d', text:"Peluk pasanganmu 10 detik sambil bilang satu hal yang kamu syukuri hari ini."},
+    {type:'q', text:"Dari semua tempat yang pernah kita kunjungi bareng, mana yang paling berkesan?"},
+    {type:'d', text:"Tatap mata pasanganmu 15 detik tanpa ketawa."},
+    {type:'q', text:"Apa yang pertama kali bikin kamu tertarik sama aku?"},
+    {type:'d', text:"Gandeng tangan pasanganmu dan sebutkan satu rencana seru buat hari ini."},
+    {type:'q', text:"Momen ketemu mana yang paling kamu rindukan kalau lagi nggak bareng?"},
+    {type:'d', text:"Cium kening pasanganmu, bilang satu hal yang kamu kangenin."},
+    {type:'q', text:"Apa hal receh yang bikin kamu ngakak kalau ingat soal aku?"},
+    {type:'d', text:"Foto bareng pasanganmu sekarang dengan pose paling random."},
+    {type:'q', text:"Kalau kita punya satu hari penuh tanpa gangguan, mau diisi apa aja?"},
+    {type:'d', text:"Pegang tangan pasanganmu dan ucapkan satu hal yang bikin kamu bahagia hari ini."},
+    {type:'q', text:"Apa panggilan sayang favoritmu buat aku, dan kenapa itu?"},
+    {type:'d', text:"Beri pasanganmu satu pujian tulus sambil menatap matanya."},
+    {type:'q', text:"Apa yang bikin waktu ketemu kita kemarin terasa spesial?"},
+    {type:'d', text:"Nyanyikan sepotong lagu untuk pasanganmu, bebas lagu apa aja."},
+    {type:'q', text:"Tempat kencan favoritmu yang pengen kita coba bareng selanjutnya?"},
+    {type:'d', text:"Rangkul pasanganmu dan diam sejenak, nikmati momen ini berdua."},
+    {type:'q', text:"Apa hadiah paling berkesan yang pernah aku beri ke kamu?"},
+    {type:'d', text:"Tirukan gaya bicara pasanganmu sampai dia ketawa."},
+    {type:'q', text:"Siapa artis atau seleb Indonesia yang diam-diam kamu suka, jujur!"},
+    {type:'d', text:"Nyanyikan jingle iklan TV jadul paling ikonik yang kamu ingat."},
+    {type:'q', text:"Pernah nggak kamu malu-maluin diri sendiri pas lagi PDKT sama aku? Cerita!"},
+    {type:'d', text:"Tunjukkan foto paling jelek di galeri HP kamu sekarang ke pasanganmu."},
+    {type:'q', text:"Apa aplikasi yang paling banyak kamu buka tiap hari dan kamu malu ngakuinnya?"},
+    {type:'d', text:"Bacain caption foto IG kamu yang paling bucin dengan dramatis."},
+    {type:'q', text:"Kalau kita bisa makan gratis di satu restoran selamanya, kamu pilih mana?"},
+    {type:'d', text:"Contohkan cara kamu bilang 'aku sayang kamu' versi lebay sinetron Indonesia."},
+    {type:'q', text:"Apa warung atau tempat makan yang paling pengen kamu ajak aku ke sana?"},
+    {type:'d', text:"Kirim stiker paling receh yang ada di koleksi WA kamu ke pasanganmu sekarang."},
+    {type:'q', text:"Pernah nggak kamu nge-ghosting seseorang sebelum kenal aku? Kenapa?"},
+    {type:'d', text:"Ceritakan plot sinetron favorit kamu waktu kecil dengan ekspresi penuh."},
+    {type:'q', text:"Apa kebiasaan pagi kamu yang kamu nggak mau aku tau?"},
+    {type:'d', text:"Tunjukkan playlist lagu yang paling sering kamu dengerin sendirian."},
+    {type:'q', text:"Pernah nggak kamu pura-pura nggak kenal aku di depan orang lain? Kapan?"},
+    {type:'d', text:"Jogetin satu lagu dangdut atau pop Indonesia selama 10 detik."},
+    {type:'q', text:"Apa drama Korea atau sinetron yang diam-diam bikin kamu nangis?"},
+    {type:'d', text:"Bacakan puisi atau pantun buatan sendiri untuk pasanganmu sekarang."},
+    {type:'q', text:"Seberapa sering kamu curhat soal aku ke teman-temanmu?"},
+    {type:'d', text:"Tunjukkan foto selfie paling receh yang ada di HP kamu."},
+    {type:'q', text:"Apa hal paling nekat yang pernah kamu lakuin demi seseorang?"},
+    {type:'d', text:"Telepon salah satu teman kamu dan bilang 'aku lagi main sama pacarku' dengan bangga."},
+    {type:'q', text:"Kamu lebih pilih mudik bareng atau liburan berdua saat hari raya?"},
+    {type:'d', text:"Peragakan cara kamu waktu pertama kali ketemu aku — dari ekspresi sampai gerakan."},
+    {type:'q', text:"Apa yang kamu lakuin waktu hujan deras dan lagi sendiri?"},
+    {type:'d', text:"Kirim voice note bilang 'kangen' dengan suara paling dramatis."},
+    {type:'q', text:"Pernah nggak kamu minta tolong orang lain buat PDKT-in aku? Siapa?"},
+    {type:'d', text:"Tunjukkan chat pertama kita dan bacain dengan ekspresi dramatis."},
+    {type:'q', text:"Apa jajanan masa kecil yang bikin kamu nostalgia banget?"},
+    {type:'d', text:"Tuliskan satu kalimat bucin di telapak tangan pasanganmu pakai jari."},
+    {type:'q', text:"Kamu lebih tipe yang tiap malem bilang selamat tidur atau langsung tidur aja?"},
+    {type:'d', text:"Kasih pijat bahu pasanganmu selama 30 detik."},
+    {type:'q', text:"Apa hal absurd yang pernah kamu lakuin karena pengaruh teman?"},
+    {type:'d', text:"Tebak isi tas atau saku pasanganmu tanpa boleh lihat, hanya raba dari luar."},
+    {type:'q', text:"Apa momen paling awkward yang pernah kita alami bareng?"},
+    {type:'d', text:"Adu jari kelingking dan buat janji kecil yang harus ditepati minggu ini."},
+    {type:'q', text:"Pernah nggak kamu sengaja ngirim pesan yang salah orang dan itu soal aku?"},
+    {type:'d', text:"Gambar wajah pasanganmu di selembar kertas atau notes HP dalam 30 detik."},
+    {type:'q', text:"Apa aplikasi yang kamu hapus tapi selalu install lagi?"},
+    {type:'d', text:"Sebutkan 5 hal yang kamu suka dari pasanganmu dalam waktu 10 detik."},
+    {type:'q', text:"Pernah nggak kamu pura-pura tidur biar nggak perlu balas chat?"},
+    {type:'d', text:"Peragakan cara kamu kalau lagi cemberut sama pasanganmu, selama 15 detik."},
+    {type:'q', text:"Apa hal yang paling sering bikin kamu ketawa sendirian kalau ingat kita?"},
+    {type:'d', text:"Bisikkan satu rahasia kecil ke telinga pasanganmu."},
+    {type:'q', text:"Kamu lebih suka naik motor bareng hujan-hujanan atau macet di mobil berdua?"},
+    {type:'d', text:"Ajak pasanganmu foto bareng dengan filter paling lucu yang ada di HP kamu."},
+    {type:'q', text:"Apa yang kamu rasain pertama kali waktu aku pegang tanganmu?"},
+    {type:'d', text:"Buatkan pasanganmu origami dari kertas kecil, bebas bentuk apa aja."},
+    {type:'q', text:"Pernah nggak kamu stalking lokasi atau story WA aku diam-diam?"},
+    {type:'d', text:"Ceritakan mimpi paling aneh yang pernah kamu alami soal pasanganmu."},
+    {type:'q', text:"Apa film Indonesia yang menurutmu paling cocok buat kita tonton bareng?"},
+    {type:'d', text:"Coba tirukan gaya makan pasanganmu waktu dia makan favoritnya."},
+    {type:'q', text:"Pernah nggak kamu bilang 'nggak ada apa-apa' padahal jelas banget ada sesuatu?"},
+    {type:'d', text:"Sebutkan 3 hal yang kamu pengen lakuin bareng pasanganmu bulan ini."},
+    {type:'q', text:"Pernah nggak kamu nangis gara-gara sesuatu soal kita dan nggak ada yang tahu?"},
+    {type:'d', text:"Kirimkan meme lucu ke pasanganmu sekarang, yang pertama kali muncul di galeri."},
+    {type:'q', text:"Apa yang bikin kamu senyum sendiri pagi ini sebelum ketemu aku?"},
+    {type:'d', text:"Buat status WA sekarang yang isinya soal pasanganmu — bebas mau bucin atau receh."},
+    {type:'q', text:"Apa hal yang paling susah kamu minta maaf ke aku?"},
+    {type:'d', text:"Tunjukkan lagu terakhir yang kamu dengerin di Spotify atau YouTube."},
+    {type:'q', text:"Kamu lebih pilih kencan di kafe estetik mahal atau di angkringan pinggir jalan?"},
+    {type:'d', text:"Pose foto prewedding imajinasi bareng pasanganmu dan tunjukkan ke kamera HP."},
+    {type:'q', text:"Apa hal yang kamu harapin kita lakuin sebelum tahun ini berakhir?"},
+    {type:'d', text:"Bilang 'aku mau nikah sama kamu' ke pasanganmu dengan muka seserius mungkin."},
+    {type:'q', text:"Seberapa sering kamu bayangin kita jalan bareng ke tempat-tempat yang belum pernah dikunjungi?"},
+    {type:'d', text:"Rangkul pasanganmu dari belakang dan diam begitu selama 15 detik."},
+    {type:'q', text:"Apa hal yang bikin kamu ngeresa kita beneran cocok, bukan cuma chemistry doang?"},
+    {type:'d', text:"Tulis satu kata di punggung tangan pasanganmu pakai jari, dia harus tebak."},
+    {type:'q', text:"Apa hal paling bucin yang pernah kamu lakuin buat aku tapi aku nggak sadar?"},
+    {type:'d', text:"Ceritakan kenangan pertama kita ketemu dari sudut pandang kamu, selengkap-lengkapnya."},
+  ]
+};
+let currentMode = null;
+let players = [ {name:'Aku', pos:1, color:'p1'}, {name:'Kamu', pos:1, color:'p2'} ];
+let current = 0;
+let gameOver = false;
+let chosenMode = null;
+document.querySelectorAll('.mode-card').forEach(card=>{
+  card.addEventListener('click', ()=>{
+    sfxClick();
+    document.querySelectorAll('.mode-card').forEach(c=>c.classList.remove('selected'));
+    card.classList.add('selected');
+    chosenMode = card.dataset.mode;
+    document.getElementById('startGameBtn').disabled = false;
+  });
+});
+document.getElementById('startGameBtn').addEventListener('click', ()=>{
+  ensureCtx();
+  sfxClick();
+  currentMode = chosenMode;
+  document.getElementById('modeOverlay').classList.remove('show');
+  document.getElementById('modeTag').textContent = 'Mode: ' + (currentMode==='deep' ? 'Deep Talk 💬' : 'Truth or Dare 🔥');
+  setStatus('Giliran Aku. Lempar dadunya!');
+  startMusic();
+});
+const board = document.getElementById('board');
+const cells = {};
+function buildBoard(){ board.innerHTML=''; for(let i=1;i<=TOTAL;i++){ const {row,col} = cellIndexToRC(i); const div = document.createElement('div'); div.className='cell'; div.style.gridRowStart = row+1; div.style.gridColumnStart = col+1; div.textContent = i; if(i===1) div.classList.add('start'); if(i===TOTAL) div.classList.add('finish'); if(ladders[i]){ div.classList.add('ladder'); const ic=document.createElement('span'); ic.className='cell-icon'; ic.textContent='🪜'; div.appendChild(ic); } if(snakes[i]){ div.classList.add('snake'); const ic=document.createElement('span'); ic.className='cell-icon'; ic.textContent='🐍'; div.appendChild(ic);} if(cardCells.includes(i)){ div.classList.add('card'); const ic=document.createElement('span'); ic.className='cell-icon'; ic.textContent='✉️'; div.appendChild(ic); } board.appendChild(div); cells[i]=div; } renderTokens(); }
+function renderTokens(){ document.querySelectorAll('.token').forEach(t=>t.remove()); players.forEach(p=>{ const t = document.createElement('div'); t.className = 'token '+p.color; cells[p.pos].appendChild(t); }); document.getElementById('pos1').textContent = 'Kotak '+players[0].pos; document.getElementById('pos2').textContent = 'Kotak '+players[1].pos; document.getElementById('pill1').classList.toggle('active', current===0); document.getElementById('pill2').classList.toggle('active', current===1); }
+function setStatus(msg){ document.getElementById('status').textContent = msg; }
+const rollBtn = document.getElementById('rollBtn');
+const diceEl = document.getElementById('dice');
+rollBtn.addEventListener('click', ()=>{ if(gameOver || !currentMode) return; ensureCtx(); sfxClick(); rollBtn.disabled = true; let rolls=0; const spin = setInterval(()=>{ diceEl.textContent = 1+Math.floor(Math.random()*6); sfxDiceTick(); rolls++; if(rolls>8){ clearInterval(spin); const result = 1+Math.floor(Math.random()*6); diceEl.textContent = result; movePlayer(result); } },70); });
+function movePlayer(steps){ const p = players[current]; let dest = p.pos + steps; if(dest > TOTAL){ setStatus(p.name+' melempar '+steps+', tapi belum cukup buat sampai. Tetap di kotak '+p.pos+'.'); endTurn(); return; } setStatus(p.name+' melempar '+steps+'...'); animateSteps(p, p.pos, dest, ()=>{ setStatus(p.name+' sampai di kotak '+dest+'.'); handleSpecialTiles(p, dest); }); }
+function animateSteps(p, from, to, onDone){ let pos = from; const stepOnce = ()=>{ if(pos >= to){ onDone(); return; } pos++; p.pos = pos; renderTokens(); sfxStep(); setTimeout(stepOnce, 420); }; setTimeout(stepOnce, 300); }
+function handleSpecialTiles(p, dest){ if(ladders[dest]){ const to = ladders[dest]; setStatus(p.name+' ketemu Tangga, naik dari kotak '+dest+' ke kotak '+to+'!'); sfxLadder(); animateSteps(p, dest, to, ()=> setTimeout(()=>afterMove(p), 250)); return; } if(snakes[dest]){ const to = snakes[dest]; setStatus(p.name+' kena Ular, mundur dari kotak '+dest+' ke kotak '+to+'.'); sfxSnake(); let pos = dest; const stepBack = ()=>{ if(pos <= to){ setTimeout(()=>afterMove(p), 250); return; } pos--; p.pos = pos; renderTokens(); setTimeout(stepBack, 320); }; setTimeout(stepBack, 300); return; } afterMove(p); }
+function afterMove(p){ if(p.pos === TOTAL){ showWin(p); return; } if(cardCells.includes(p.pos)){ showCard(); return; } endTurn(); }
+function showCard(){ sfxCard(); const deck = decks[currentMode]; const card = deck[Math.floor(Math.random()*deck.length)]; renderCard(card.type, card.text); }
+function renderCard(type, text){ document.getElementById('cardType').textContent = type==='q' ? 'TRUTH' : 'DARE'; document.getElementById('cardType').className = 'pc-type '+type; document.getElementById('cardText').textContent = text; document.getElementById('cardOverlay').classList.add('show'); }
+document.getElementById('cardCloseBtn').addEventListener('click', ()=>{ sfxClick(); document.getElementById('cardOverlay').classList.remove('show'); endTurn(); });
+function showWin(p){ gameOver = true; sfxWin(); document.getElementById('winText').textContent = p.name+' berhasil sampai duluan! Makasih udah ngabisin waktu seru ini bareng-bareng. 💛'; document.getElementById('winOverlay').classList.add('show'); }
+document.getElementById('winCloseBtn').addEventListener('click', ()=>{ sfxClick(); document.getElementById('winOverlay').classList.remove('show'); players[0].pos=1; players[1].pos=1; current=0; gameOver=false; renderTokens(); setStatus('Giliran Aku. Lempar dadunya!'); });
+function endTurn(){ current = current===0 ? 1 : 0; renderTokens(); if(!gameOver){ setStatus('Giliran '+players[current].name+'.'); } rollBtn.disabled = false; }
+buildBoard();
+</script>
+</body>
+</html>

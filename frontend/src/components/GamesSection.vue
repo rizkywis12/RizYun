@@ -16,15 +16,16 @@
 
 <script setup>
 const games = [
-  { id: '1', title: 'Tebak Kenangan', icon: '❓', href: '/games.html#tebak' },
-  { id: '2', title: 'Puzzle Foto', icon: '🧩', href: '/games.html#puzzle' },
-  { id: '3', title: 'Quiz Cinta', icon: '❤️', href: '/games.html#quiz' }
+  { id: '1', title: 'Uler Tangga', icon: '🐍', href: '/uler-tangga.html' },
+  { id: '2', title: 'Gamsit', icon: '✊✌️✋', href: '/gamsit.html' },
+  { id: '3', title: 'Would You Rather', icon: '🤔', href: '/would-you-rather.html' }
 ]
 </script>
 
 <style scoped>
 .games-section { padding: 6rem 1rem; color: var(--text); }
 .games-list { display:flex; gap:1rem; justify-content:center; flex-wrap:wrap }
-.game-card { display:flex; flex-direction:column; gap:0.5rem; align-items:center; padding:1rem; width:140px; text-decoration:none; color:inherit; background:rgba(255,255,255,0.02); border-radius:10px }
+.game-card { display:flex; flex-direction:column; gap:0.5rem; align-items:center; padding:1rem; width:140px; min-height:140px; text-decoration:none; color:inherit; background:rgba(255,255,255,0.02); border-radius:10px; transition:transform .2s ease, background .2s ease; }
+.game-card:hover { transform: translateY(-4px); background:rgba(255,255,255,0.08); }
 .game-card .icon { font-size:1.6rem }
 </style>

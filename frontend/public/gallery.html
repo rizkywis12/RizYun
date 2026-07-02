@@ -21,14 +21,43 @@
       .panel h3{margin-top:0;margin-bottom:0.75rem;font-size:1.05rem;}
       .panel label{display:block;margin-bottom:0.75rem;font-size:0.95rem;color:#cbd6f5;}
       .panel input[type=file]{width:100%;color:#fff;}
+      .panel input[type=password], .panel input[type=text]{width:100%;padding:0.7rem 0.8rem;border-radius:999px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.06);color:#fff;}
       .panel button{border:none;padding:0.85rem 1rem;border-radius:999px;background:linear-gradient(135deg,#7c5cff,#4d88ff);color:#fff;cursor:pointer;font-weight:600;transition:.2s ease;}
+      .panel button.secondary{background:linear-gradient(135deg,#2f3648,#4b5563);} 
+      .auth-row{display:flex;gap:0.5rem;flex-wrap:wrap;}
+      .muted{color:#8d99b1;font-size:0.9rem;}
+      .editor-only{display:none;}
       .panel button:hover{transform:translateY(-1px);}
+      .upload-progress{display:none;margin-top:1rem;}
+      .progress-track{width:100%;height:10px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;}
+      .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7c5cff,#4d88ff);transition:width .2s ease;}
+      .upload-progress strong{display:block;margin-top:0.45rem;color:#8be4ff;font-size:0.95rem;}
       .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
       .album-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:20px;overflow:hidden;}
-      .thumb{min-height:220px;background:linear-gradient(135deg,#151722,#0a0b10);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;}
-      .thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+      .thumb{height:220px;aspect-ratio:4/3;background:linear-gradient(135deg,#151722,#0a0b10);display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;}
+      .thumb img,
+      .thumb video{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in;}
+      .thumb video{background:#000;}
+      .album-card{display:flex;flex-direction:column;}
       .album-card h3{margin:1rem 1rem 0.45rem;font-size:1.05rem;}
       .album-card p{margin:0 1rem 1rem;color:#9aa2b2;font-size:0.95rem;}
+      .card-actions{display:flex;justify-content:space-between;align-items:center;gap:0.5rem;padding:0 1rem 1rem;margin-top:auto;}
+      .view-btn,.delete-btn,.download-btn{border:none;padding:0.6rem 0.85rem;border-radius:999px;color:#fff;cursor:pointer;font-weight:600;}
+      .view-btn{background:linear-gradient(135deg,#4d88ff,#7c5cff);} 
+      .download-btn{background:linear-gradient(135deg,#47d7ff,#3ec8ff);} 
+      .delete-btn{background:linear-gradient(135deg,#ff5c7a,#ff8a41);} 
+      .view-btn:hover,.delete-btn:hover,.download-btn:hover{transform:translateY(-1px);} 
+      .viewer-overlay{position:fixed;inset:0;background:rgba(3,6,14,0.94);display:none;align-items:center;justify-content:center;z-index:9999;padding:1.25rem;}
+      .viewer-overlay.open{display:flex;}
+      .viewer-stage{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:1100px;width:100%;}
+      .viewer-img, .viewer-video{max-width:100%;max-height:78vh;object-fit:contain;border-radius:24px;box-shadow:0 20px 60px rgba(0,0,0,.45);}
+      .viewer-video{display:none;}
+      .viewer-caption{margin-top:0.9rem;color:#f2f6ff;font-weight:600;text-align:center;}
+      .viewer-nav,.viewer-close{position:absolute;border:none;background:rgba(255,255,255,0.16);color:#fff;border-radius:50%;width:44px;height:44px;cursor:pointer;font-size:1.2rem;backdrop-filter:blur(8px);} 
+      .viewer-close{top:1rem;right:1rem;} 
+      .viewer-nav{top:50%;transform:translateY(-50%);} 
+      .viewer-nav-left{left:1rem;} 
+      .viewer-nav-right{right:1rem;} 
       .flash{margin-top:1rem;color:#8bffa1;font-weight:600;}
       .error{margin-top:1rem;color:#ff7a7a;font-weight:600;}
       .empty-state{padding:1.5rem;background:rgba(255,255,255,0.03);border:1px dashed rgba(255,255,255,0.14);border-radius:20px;text-align:center;color:#b0b7c6;}
@@ -49,9 +78,9 @@
         <h2 id="albumTitle">Loading album...</h2>
         <p id="albumInfo">Please wait while we load the album contents.</p>
       </section>
-
+      <p id="authHint" class="note" style="display:none; margin-bottom: 1rem;">Login sebagai editor untuk mengupload foto atau menghapus item.</p>
       <div class="upload-panel">
-        <section class="panel">
+        <section class="panel editor-only">
           <h3>Set Album Thumbnail</h3>
           <form id="thumbnailForm" class="upload-form" onsubmit="return false;">
             <label for="thumbnailInput">Upload file named <strong>thumbnail</strong></label>
@@ -61,18 +90,33 @@
           <p class="note">The thumbnail file will be stored as <code>thumbnail</code> inside the album and used as cover image.</p>
           <p id="thumbnailMessage" class="flash" style="display:none"></p>
         </section>
-        <section class="panel">
-          <h3>Upload Photo to Album</h3>
+        <section class="panel editor-only">
+          <h3>Upload Photo / Video to Album</h3>
           <form id="photoForm" class="upload-form" onsubmit="return false;">
-            <label for="photoInput">Upload any image file to add to album</label>
-            <input id="photoInput" type="file" accept="image/*" />
-            <button id="photoUploadBtn" type="button">Upload Photo</button>
+            <label for="photoInput">Select one or more images or videos to add to album</label>
+            <input id="photoInput" type="file" accept="image/*,video/*" multiple />
+            <button id="photoUploadBtn" type="button">Upload Media</button>
+            <div id="photoProgress" class="upload-progress">
+              <div class="progress-track"><div id="photoProgressFill" class="progress-fill"></div></div>
+              <strong id="photoProgressLabel">0%</strong>
+            </div>
           </form>
           <p class="note">Uploaded files are stored with a timestamp prefix so they remain unique.</p>
           <p id="photoMessage" class="flash" style="display:none"></p>
         </section>
       </div>
 
+      <p id="galleryMessage" class="flash" style="display:none"></p>
+      <div id="viewerOverlay" class="viewer-overlay" aria-hidden="true">
+        <button id="viewerClose" class="viewer-close" type="button" aria-label="Close fullscreen">×</button>
+        <button id="viewerPrev" class="viewer-nav viewer-nav-left" type="button" aria-label="Previous image">‹</button>
+        <div class="viewer-stage">
+          <img id="viewerImage" class="viewer-img" alt="" />
+          <video id="viewerVideo" class="viewer-video" controls playsinline style="display:none;"></video>
+          <div id="viewerCaption" class="viewer-caption"></div>
+        </div>
+        <button id="viewerNext" class="viewer-nav viewer-nav-right" type="button" aria-label="Next image">›</button>
+      </div>
       <div id="content" class="grid"></div>
     </div>
 
@@ -93,12 +137,111 @@
       const photoUploadBtn = document.getElementById('photoUploadBtn');
       const thumbnailMessage = document.getElementById('thumbnailMessage');
       const photoMessage = document.getElementById('photoMessage');
+      const photoProgress = document.getElementById('photoProgress');
+      const photoProgressFill = document.getElementById('photoProgressFill');
+      const photoProgressLabel = document.getElementById('photoProgressLabel');
+      const galleryMessage = document.getElementById('galleryMessage');
+      const editorPanels = Array.from(document.querySelectorAll('.editor-only'));
+      const uploadPanel = document.querySelector('.upload-panel');
+      const authHint = document.getElementById('authHint');
+      const viewerOverlay = document.getElementById('viewerOverlay');
+      const viewerImage = document.getElementById('viewerImage');
+      const viewerVideo = document.getElementById('viewerVideo');
+      const viewerCaption = document.getElementById('viewerCaption');
+      const viewerClose = document.getElementById('viewerClose');
+      const viewerPrev = document.getElementById('viewerPrev');
+      const viewerNext = document.getElementById('viewerNext');
+      let galleryItems = [];
+      let currentViewerIndex = 0;
 
       function showMessage(el, text, isError = false) {
         el.style.display = 'block';
         el.textContent = text;
         el.style.color = isError ? '#ff7a7a' : '#8bffa1';
       }
+
+      async function deleteAlbumItem(key) {
+        if (!album) return;
+        if (!window.confirm('Delete this item from the album?')) return;
+
+        try {
+          const res = await fetch(`${API_ROOT}/api/albums/${encodeURIComponent(album)}/files`, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || `Delete failed ${res.status}`);
+          showMessage(galleryMessage, 'Item deleted successfully.');
+          await loadAlbum(album);
+        } catch (err) {
+          console.error(err);
+          showMessage(galleryMessage, err.message || 'Delete failed', true);
+        }
+      }
+
+      function showViewerMedia(item) {
+        const isVideo = item.type === 'video';
+        if (isVideo) {
+          viewerImage.style.display = 'none';
+          viewerVideo.style.display = 'block';
+          viewerVideo.src = item.url;
+          viewerVideo.setAttribute('aria-label', item.label || 'Video preview');
+          viewerVideo.load();
+          viewerVideo.play().catch(() => {});
+        } else {
+          viewerVideo.pause();
+          viewerVideo.src = '';
+          viewerVideo.style.display = 'none';
+          viewerImage.style.display = 'block';
+          viewerImage.src = item.url;
+          viewerImage.alt = item.label;
+        }
+        viewerCaption.textContent = item.label;
+      }
+
+      function openViewer(index) {
+        if (!galleryItems.length) return;
+        currentViewerIndex = (index + galleryItems.length) % galleryItems.length;
+        showViewerMedia(galleryItems[currentViewerIndex]);
+        viewerOverlay.classList.add('open');
+        viewerOverlay.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeViewer() {
+        viewerVideo.pause();
+        viewerVideo.src = '';
+        viewerOverlay.classList.remove('open');
+        viewerOverlay.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+      }
+
+      function showNextViewer() {
+        if (!galleryItems.length) return;
+        currentViewerIndex = (currentViewerIndex + 1) % galleryItems.length;
+        showViewerMedia(galleryItems[currentViewerIndex]);
+      }
+
+      function showPrevViewer() {
+        if (!galleryItems.length) return;
+        currentViewerIndex = (currentViewerIndex - 1 + galleryItems.length) % galleryItems.length;
+        showViewerMedia(galleryItems[currentViewerIndex]);
+      }
+
+      viewerClose.addEventListener('click', closeViewer);
+      viewerPrev.addEventListener('click', showPrevViewer);
+      viewerNext.addEventListener('click', showNextViewer);
+      viewerOverlay.addEventListener('click', (event) => {
+        if (event.target === viewerOverlay) closeViewer();
+      });
+      document.addEventListener('keydown', (event) => {
+        if (viewerOverlay.getAttribute('aria-hidden') !== 'false') return;
+        if (event.key === 'Escape') closeViewer();
+        if (event.key === 'ArrowRight') showNextViewer();
+        if (event.key === 'ArrowLeft') showPrevViewer();
+      });
 
       async function loadAlbum(name) {
         try {
@@ -112,15 +255,30 @@
 
           content.innerHTML = '';
           albumInfo.textContent = `${photoItems.length} photo(s) in this album.`;
+          galleryItems = photoItems.filter(i => !i.key.endsWith('/.keep')).map(i => {
+            const lowerKey = i.key.toLowerCase();
+            const isVideo = /\.(mp4|mov|webm|ogg|m4v)$/.test(lowerKey);
+            return { ...i, label: i.key.split('/').pop(), type: isVideo ? 'video' : 'image' };
+          });
 
           if (thumbnailItem) {
             const thumbCard = document.createElement('section');
             thumbCard.className = 'album-card';
-            thumbCard.innerHTML = `<div class="thumb"><img src="${thumbnailItem.url}" alt="Album thumbnail"/></div><h3>Album Thumbnail</h3><p>Filename: thumbnail</p>`;
+            let thumbHtml = `<div class="thumb"><img src="${thumbnailItem.url}" alt="Album thumbnail"/></div><h3>Album Thumbnail</h3><p>Filename: thumbnail</p>`;
+            if (isEditor) {
+              thumbHtml += `<div class="card-actions"><button type="button" class="download-btn" data-key="${thumbnailItem.key}" data-name="thumbnail">Download</button><button type="button" class="delete-btn" data-key="${thumbnailItem.key}">Delete</button></div>`;
+            } else {
+              thumbHtml += `<div class="card-actions"><button type="button" class="download-btn" data-key="${thumbnailItem.key}" data-name="thumbnail">Download</button></div>`;
+            }
+            thumbCard.innerHTML = thumbHtml;
+            const deleteBtn = thumbCard.querySelector('.delete-btn');
+            const downloadBtn = thumbCard.querySelector('.download-btn');
+            if (downloadBtn) downloadBtn.addEventListener('click', () => downloadMedia(thumbnailItem.key, 'thumbnail'));
+            if (deleteBtn) deleteBtn.addEventListener('click', () => deleteAlbumItem(thumbnailItem.key));
             content.appendChild(thumbCard);
           }
 
-          const visiblePhotos = photoItems.filter(i => !i.key.endsWith('/.keep'));
+          const visiblePhotos = galleryItems;
           if (visiblePhotos.length === 0) {
             const emptyCard = document.createElement('section');
             emptyCard.className = 'album-card empty-state';
@@ -129,23 +287,33 @@
             return;
           }
 
-          visiblePhotos.forEach(it => {
-            const fileName = it.key.split('/').pop();
+          visiblePhotos.forEach((it, index) => {
+            const fileName = it.label;
             const sizeKb = Math.round(it.size / 1024);
             const sec = document.createElement('section');
             sec.className = 'album-card';
-            sec.innerHTML = `<div class="thumb"><img src="${it.url}" alt="${fileName}"/></div><h3>${fileName}</h3><p>${sizeKb} KB</p>`;
+            const thumbHtml = it.type === 'video'
+              ? `<div class="thumb"><video class="thumb-video" muted playsinline preload="metadata" src="${it.url}"></video></div>`
+              : `<div class="thumb"><img src="${it.url}" alt="${fileName}"/></div>`;
+            let cardHtml = `${thumbHtml}<h3>${fileName}</h3><p>${sizeKb} KB</p><div class="card-actions"><button type="button" class="view-btn">Open Fullscreen</button><button type="button" class="download-btn" data-key="${it.key}" data-name="${fileName}">Download</button>`;
+            if (isEditor) {
+              cardHtml += `<button type="button" class="delete-btn" data-key="${it.key}">Delete</button>`;
+            }
+            cardHtml += `</div>`;
+            sec.innerHTML = cardHtml;
+            const viewBtn = sec.querySelector('.view-btn');
+            const downloadBtn = sec.querySelector('.download-btn');
+            const thumbImg = sec.querySelector('.thumb img');
+            const thumbVideo = sec.querySelector('.thumb video');
+            const deleteBtn = sec.querySelector('.delete-btn');
+            viewBtn.addEventListener('click', () => openViewer(index));
+            if (downloadBtn) downloadBtn.addEventListener('click', () => downloadMedia(it.key, fileName));
+            if (thumbImg) thumbImg.addEventListener('click', () => openViewer(index));
+            if (thumbVideo) thumbVideo.addEventListener('click', () => openViewer(index));
+            if (deleteBtn) deleteBtn.addEventListener('click', () => deleteAlbumItem(it.key));
             content.appendChild(sec);
           });
 
-          photoItems.forEach(it => {
-            const fileName = it.key.split('/').pop();
-            const sizeKb = Math.round(it.size / 1024);
-            const sec = document.createElement('section');
-            sec.className = 'album-card';
-            sec.innerHTML = `<div class="thumb"><img src="${it.url}" alt="${fileName}"/></div><h3>${fileName}</h3><p>${sizeKb} KB</p>`;
-            content.appendChild(sec);
-          });
         } catch (e) {
           console.error(e);
           albumTitle.textContent = 'Album not found';
@@ -154,26 +322,108 @@
         }
       }
 
-      async function uploadFile(endpoint, fieldName, fileInput, messageEl, successText) {
-        const file = fileInput.files[0];
-        if (!file) {
-          showMessage(messageEl, 'Please select a file first.', true);
-          return;
-        }
-        const form = new FormData();
-        form.append(fieldName, file, fieldName === 'thumbnail' ? 'thumbnail' : file.name);
+      let isEditor = false;
+
+      function setEditorAccess(allowed) {
+        isEditor = allowed;
+        editorPanels.forEach(panel => {
+          panel.style.display = allowed ? 'block' : 'none';
+        });
+        if (uploadPanel) uploadPanel.style.display = allowed ? 'grid' : 'none';
+        if (authHint) authHint.style.display = allowed ? 'none' : 'block';
+      }
+
+      async function checkAuth() {
         try {
-          const res = await fetch(`${API_ROOT}${endpoint}`, { method: 'POST', body: form });
+          const res = await fetch(`${API_ROOT}/api/auth/me`, { credentials: 'include' });
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error || `Upload failed ${res.status}`);
-          showMessage(messageEl, successText);
-          fileInput.value = '';
-          await loadAlbum(album);
+          setEditorAccess(Boolean(data.authenticated && data.role === 'editor'));
         } catch (err) {
-          console.error(err);
-          showMessage(err.message || 'Upload failed', true);
+          setEditorAccess(false);
         }
       }
+
+      function downloadMedia(key, fileName) {
+        try {
+          const url = `${API_ROOT}/api/albums/${encodeURIComponent(album)}/download?key=${encodeURIComponent(key)}`;
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          a.target = '_blank';
+          a.rel = 'noreferrer noopener';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        } catch (err) {
+          console.error(err);
+          showMessage(galleryMessage, err.message || 'Download failed', true);
+        }
+      }
+
+      async function uploadFile(endpoint, fieldName, fileInput, messageEl, successText, progressEl, fillEl, labelEl) {
+        const files = Array.from(fileInput.files || []);
+      if (!files.length) {
+        showMessage(messageEl, 'Please select a file first.', true);
+        return;
+      }
+
+      if (!isEditor) {
+        showMessage(messageEl, 'Please log in as editor to upload.', true);
+        return;
+      }
+
+      if (progressEl) {
+        progressEl.style.display = 'block';
+        fillEl.style.width = '0%';
+        labelEl.textContent = '0%';
+      }
+
+      const form = new FormData();
+      files.forEach((file) => {
+        form.append(fieldName, file, fieldName === 'thumbnail' ? 'thumbnail' : file.name);
+      });
+
+        if (progressEl) {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `${API_ROOT}${endpoint}`);
+          xhr.withCredentials = true;
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percent = Math.round((event.loaded / event.total) * 100);
+              fillEl.style.width = `${percent}%`;
+              labelEl.textContent = `${percent}%`;
+            }
+          };
+          xhr.onload = async () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              showMessage(messageEl, successText);
+              fileInput.value = '';
+              await loadAlbum(album);
+            } else {
+              const data = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+              showMessage(messageEl, data.error || `Upload failed ${xhr.status}`, true);
+            }
+          };
+          xhr.onerror = () => {
+            showMessage(messageEl, 'Upload failed due to network error.', true);
+          };
+          xhr.send(form);
+        } else {
+          try {
+            const res = await fetch(`${API_ROOT}${endpoint}`, { method: 'POST', credentials: 'include', body: form });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || `Upload failed ${res.status}`);
+            showMessage(messageEl, successText);
+            fileInput.value = '';
+            await loadAlbum(album);
+          } catch (err) {
+            console.error(err);
+            showMessage(err.message || 'Upload failed', true);
+          }
+        }
+      }
+
+      checkAuth();
 
       if (album) {
         loadAlbum(album);
@@ -188,7 +438,7 @@
       });
 
       photoUploadBtn.addEventListener('click', () => {
-        uploadFile(`/api/albums/${encodeURIComponent(album)}/photos`, 'file', photoInput, photoMessage, 'Photo uploaded successfully.');
+        uploadFile(`/api/albums/${encodeURIComponent(album)}/photos`, 'file', photoInput, photoMessage, 'Photos uploaded successfully.', photoProgress, photoProgressFill, photoProgressLabel);
       });
     </script>
   </body>

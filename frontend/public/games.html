@@ -5,33 +5,58 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Games - RizYun</title>
     <style>
-      body{background:#0f0f10;color:#fff;font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;padding:2rem}
-      .wrap{max-width:900px;margin:0 auto}
-      .game{background:rgba(255,255,255,0.02);padding:1rem;border-radius:10px;margin-bottom:1rem}
-      a{color:#ff4081}
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: system-ui,Segoe UI,Roboto,Arial,sans-serif; background: #07080e; color: #fff; }
+      .wrap { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+      h1, h2 { margin: 0 0 0.8rem; }
+      p { margin: 0 0 1rem; color: #cfd5ea; }
+      .section { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 1.5rem; margin-bottom: 1.5rem; }
+      .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap:1rem; }
+      .card { background: rgba(255,255,255,0.03); border-radius: 18px; border: 1px solid rgba(255,255,255,0.08); padding: 1rem; }
+      .button-row, .options { display:flex; flex-wrap:wrap; gap:0.75rem; }
+      button { border:none; border-radius:999px; padding:0.8rem 1rem; cursor:pointer; font-weight:600; transition: transform .15s ease, background .15s ease; }
+      button:hover { transform: translateY(-1px); }
+      .primary { background: linear-gradient(135deg,#5d7dff,#7f64ff); color:#fff; }
+      .secondary { background: rgba(255,255,255,0.08); color:#fff; }
+      .success { background: linear-gradient(135deg,#47d7ff,#3ec8ff); color:#fff; }
+      .score, .result, .note { margin-bottom: 1rem; }
+      .board { display:grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 6px; margin:1rem 0; }
+      .square { aspect-ratio: 1; display:flex; align-items:center; justify-content:center; border-radius:14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); font-size: 0.85rem; position: relative; }
+      .square.active { background: linear-gradient(135deg,#7c5cff,#4d88ff); color:#fff; }
+      .square::after { content: attr(data-label); position:absolute; top:6px; right:6px; font-size:0.75rem; color:#9aa2b2; }
+      .choice-btn { flex: 1; min-width: 90px; }
+      .prompt { margin-bottom: 1rem; font-size: 1.05rem; }
+      .nav-link { display:inline-block; margin-top:0.5rem; color:#7c5cff; text-decoration:none; }
+      @media (max-width: 720px) { .wrap { padding: 1rem; } }
     </style>
   </head>
   <body>
     <div class="wrap">
       <h1>Games</h1>
-      <p>Pilih game di bawah untuk mulai.</p>
+      <p>Pilih game di bawah untuk bermain bersama.</p>
 
-      <section id="tebak" class="game">
-        <h2>Tebak Kenangan</h2>
-        <p>Permainan sederhana: tebak momen spesial.</p>
-      </section>
+      <div class="grid">
+        <section class="section card">
+          <h2>Uler Tangga</h2>
+          <p class="note">Lempar dadu dan capai kotak terakhir. Hati-hati ular dan tangga!</p>
+          <a class="primary" href="/uler-tangga.html">Buka Uler Tangga</a>
+        </section>
 
-      <section id="puzzle" class="game">
-        <h2>Puzzle Foto</h2>
-        <p>Putar puzzle dari foto-foto kenangan.</p>
-      </section>
+        <section class="section card">
+          <h2>Gamsit</h2>
+          <p class="note">Pilih Gunting, Batu, atau Kertas dan lihat siapa yang menang.</p>
+          <a class="primary" href="/gamsit.html">Buka Gamsit</a>
+        </section>
 
-      <section id="quiz" class="game">
-        <h2>Quiz Cinta</h2>
-        <p>Kuis tentang hubungan kalian.</p>
-      </section>
+        <section class="section card">
+          <h2>Would You Rather</h2>
+          <p class="note">Pilih opsi yang paling kamu sukai dan dapatkan pertanyaan baru.</p>
+          <a class="primary" href="/would-you-rather.html">Buka Would You Rather</a>
+        </section>
+      </div>
 
-      <p><a href="/">Kembali ke halaman utama</a></p>
+      <a class="nav-link" href="/">Kembali ke halaman utama</a>
     </div>
   </body>
 </html>

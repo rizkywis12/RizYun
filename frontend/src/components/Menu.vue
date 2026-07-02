@@ -1,168 +1,102 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
-defineProps({
-  open: {
-    type: Boolean,
-    default: false
+const authOpen = ref(false)
+const authMessage = ref('')
+const username = ref('')
+const password = ref('')
+const authState = ref({ authenticated: false, role: 'viewer' })
+const API_URL = import.meta.env.VITE_API_URL || ''
+
+async function checkAuth() {
+  try {
+    const res = await fetch(`${API_URL}/api/auth/me`, { credentials: 'include' })
+    const data = await res.json()
+    authState.value = data
+  } catch (e) {
+    authState.value = { authenticated: false, role: 'viewer' }
   }
+}
+
+async function submitLogin() {
+  authMessage.value = ''
+  try {
+    const res = await fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username.value, password: password.value })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Login failed')
+    authState.value = { authenticated: true, role: 'editor', username: username.value }
+    authMessage.value = 'Login berhasil.'
+    password.value = ''
+    window.dispatchEvent(new CustomEvent('rizyun-auth-changed', { detail: { authenticated: true, role: 'editor' } }))
+  } catch (e) {
+    authState.value = { authenticated: false, role: 'viewer' }
+    authMessage.value = e.message || 'Login gagal'
+  }
+}
+
+async function logout() {
+  try {
+    await fetch(`${API_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' })
+  } catch (e) {}
+  authState.value = { authenticated: false, role: 'viewer' }
+  authMessage.value = 'Keluar.'
+  window.dispatchEvent(new CustomEvent('rizyun-auth-changed', { detail: { authenticated: false, role: 'viewer' } }))
+}
+
+onMounted(() => {
+  checkAuth()
 })
-
-defineEmits(['toggle'])
-
-const menuItems = [
-  { id: 1, label: 'Home', icon: '🏠', href: '#' },
-  { id: 2, label: 'Galeri', icon: '📸', href: '#galeri' },
-  { id: 3, label: 'Momen Spesial', icon: '💕', href: '#momen' },
-  { id: 4, label: 'Timeline', icon: '📅', href: '#timeline' },
-  { id: 5, label: 'Pesan Cinta', icon: '💌', href: '#pesan' },
-  { id: 6, label: 'Kontak', icon: '📞', href: '#kontak' }
-]
 </script>
 
 <template>
   <div class="menu-wrapper">
-    <!-- Menu Button -->
-    <button class="menu-btn" @click="$emit('toggle')" :class="{ active: open }">
-      <span></span>
-      <span></span>
-      <span></span>
-    </button>
+    <div v-if="authOpen" class="auth-backdrop" @click.self="authOpen = false">
+      <div class="auth-modal">
+        <div class="auth-header">
+          <h3>Login Editor</h3>
+          <button class="close-btn" @click="authOpen = false">✕</button>
+        </div>
 
-    <!-- Menu Panel -->
-    <div class="menu-panel" :class="{ open }">
-      <div class="menu-header">
-        <h2>Menu</h2>
-        <button class="close-btn" @click="$emit('toggle')">✕</button>
-      </div>
+        <label class="auth-label" for="menu-username">Username</label>
+        <input id="menu-username" v-model="username" type="text" placeholder="Username" />
 
-      <nav class="menu-list">
-        <a
-          v-for="item in menuItems"
-          :key="item.id"
-          :href="item.href"
-          class="menu-item"
-          @click="$emit('toggle')"
-        >
-          <span class="icon">{{ item.icon }}</span>
-          <span class="label">{{ item.label }}</span>
-        </a>
-      </nav>
+        <label class="auth-label" for="menu-password">Password</label>
+        <input id="menu-password" v-model="password" type="password" placeholder="Password" />
 
-      <div class="menu-footer">
-        <p>© 2024 RizYun | Our Love Story ❤️</p>
+        <div class="auth-actions">
+          <button v-if="authState.authenticated" class="secondary-btn" @click="logout">Logout</button>
+          <button class="primary-btn" @click="submitLogin">Login</button>
+        </div>
+
+        <p v-if="authMessage" class="auth-message">{{ authMessage }}</p>
+        <p class="auth-hint">Viewer bisa buka galeri. Editor bisa tambah/ubah/hapus setelah login.</p>
       </div>
     </div>
-
-    <!-- Backdrop -->
-    <div v-if="open" class="menu-backdrop" @click="$emit('toggle')"></div>
   </div>
 </template>
 
 <style scoped>
 .menu-wrapper {
   position: fixed;
-  top: 0;
-  right: 0;
+  inset: 0;
+  pointer-events: none;
   z-index: 100;
 }
 
-.menu-btn {
+.auth-backdrop {
   position: fixed;
-  top: 2rem;
-  right: 2rem;
-  z-index: 101;
-  width: 3rem;
-  height: 3rem;
-  background: rgba(0, 0, 0, 0.6);
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-radius: 50%;
-  cursor: pointer;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-}
-
-.menu-btn:hover {
-  border-color: rgba(255, 255, 255, 0.8);
-  background: rgba(0, 0, 0, 0.8);
-}
-
-.menu-btn.active {
-  background: rgba(255, 64, 129, 0.3);
-  border-color: #ff4081;
-}
-
-.menu-btn span {
-  width: 1.2rem;
-  height: 2px;
-  background: white;
-  border-radius: 2px;
-  transition: all 0.3s ease;
-}
-
-.menu-btn.active span:nth-child(1) {
-  transform: rotate(45deg) translate(0.8rem, 0.8rem);
-}
-
-.menu-btn.active span:nth-child(2) {
-  opacity: 0;
-}
-
-.menu-btn.active span:nth-child(3) {
-  transform: rotate(-45deg) translate(0.5rem, -0.5rem);
-}
-
-.menu-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.18);
-  z-index: 50;
-  animation: fadeIn 0.3s ease;
-}
-
-.menu-panel {
-  position: fixed;
-  top: 0;
-  right: -400px;
-  width: 100%;
-  max-width: 400px;
-  height: 100%;
-  background: rgba(12, 12, 12, 0.32);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.18);
-  z-index: 75;
-  display: flex;
-  flex-direction: column;
-  transition: right 0.3s ease;
-}
-
-.menu-panel.open {
-  right: 0;
-}
-
-.menu-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.menu-header h2 {
-  margin: 0;
-  color: white;
-  font-size: 1.5rem;
-  font-weight: 600;
+  padding: 1rem;
+  z-index: 200;
 }
 
 .close-btn {
@@ -184,46 +118,6 @@ const menuItems = [
   transform: rotate(90deg);
 }
 
-.menu-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem 0;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 1.2rem;
-  padding: 1rem 1.75rem;
-  color: rgba(255, 255, 255, 0.88);
-  text-decoration: none;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  border-left: 3px solid transparent;
-  font-size: 0.92rem;
-  font-weight: 500;
-  font-family: 'Comic Neue', 'Comic Sans MS', 'Segoe Print', cursive;
-}
-
-.menu-item:hover {
-  background: rgba(255, 64, 129, 0.14);
-  border-left-color: #ff4081;
-  color: #ff4081;
-  padding-left: 2.2rem;
-}
-
-.menu-item .label {
-  flex: 1;
-}
-
-.menu-footer {
-  padding: 2rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  text-align: center;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.9rem;
-}
-
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -233,32 +127,95 @@ const menuItems = [
   }
 }
 
+.auth-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 200;
+}
+
+.auth-modal {
+  width: min(420px, 100%);
+  background: rgba(8,10,18,0.96);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px;
+  padding: 1.25rem;
+  box-shadow: 0 25px 70px rgba(0,0,0,0.35);
+}
+
+.auth-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.auth-header h3 {
+  margin: 0;
+  color: white;
+}
+
+.auth-label {
+  display: block;
+  color: rgba(255,255,255,0.8);
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.auth-modal input {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.04);
+  color: white;
+  border-radius: 999px;
+  padding: 0.8rem 0.95rem;
+  margin-bottom: 0.8rem;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0.35rem;
+}
+
+.auth-actions button {
+  border: none;
+  border-radius: 999px;
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #ff4081, #ff8b00);
+  color: white;
+}
+
+.secondary-btn {
+  background: rgba(255,255,255,0.1);
+  color: white;
+}
+
+.auth-message {
+  margin-top: 0.85rem;
+  color: #8be4ff;
+  font-size: 0.95rem;
+}
+
+.auth-hint {
+  margin-top: 0.7rem;
+  color: rgba(255,255,255,0.65);
+  font-size: 0.9rem;
+}
+
 @media (max-width: 768px) {
-  .menu-btn {
-    top: 1.5rem;
-    right: 1.5rem;
-    width: 2.5rem;
-    height: 2.5rem;
-    gap: 0.4rem;
-  }
-
-  .menu-btn span {
-    width: 1rem;
-  }
-
-  .menu-panel {
-    max-width: 100%;
-    right: -100%;
-  }
-
-  .menu-item {
-    padding: 1rem 1.5rem;
-    gap: 1rem;
-    font-size: 0.95rem;
-  }
-
-  .menu-item:hover {
-    padding-left: 2rem;
+  .floating-actions {
+    bottom: 0.9rem;
   }
 }
 </style>
